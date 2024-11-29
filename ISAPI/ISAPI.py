@@ -5,6 +5,12 @@ import xml.etree.ElementTree as ET
 
 
 class ISAPI:
+    @staticmethod
+    def is_request_has_successs(response):
+        if response["success"] == 0 or response["error"] or response["status_code"] != 200:
+            return True
+        return False
+
     ISAPI_PATHS = {
         "DEVICE_INFO": "/ISAPI/System/deviceinfo",
         "USERS": "/ISAPI/Security/users",
@@ -19,6 +25,16 @@ class ISAPI:
         "status": "/ISAPI/System/Video/capabilities",  # ?
     }
 
+    def __init__(self, ip, login="admin", password="12345", protocol="http"):
+        self.ip = ip
+        self.login = login
+        self.password = password
+        self.protocol = protocol
+
+    def __make_url__(self, isapi_abs_path: str) -> str:
+        url = self.protocol + "://" + self.ip + isapi_abs_path
+        return url
+
     def xml_to_dict_recursive(self, root):
 
         trash_perfix = "{http://www.hikvision.com/ver20/XMLSchema}"
@@ -31,16 +47,6 @@ class ISAPI:
             return {tag: root.text}
         else:
             return {tag: list(map(self.xml_to_dict_recursive, list(root)))}
-
-    def __init__(self, ip, login="admin", password="12345", protocol="http"):
-        self.ip = ip
-        self.login = login
-        self.password = password
-        self.protocol = protocol
-
-    def __make_url__(self, isapi_abs_path: str) -> str:
-        url = self.protocol + "://" + self.ip + isapi_abs_path
-        return url
 
     def get_request(self, isapi_abs_path):
         url = self.__make_url__(isapi_abs_path)
@@ -64,12 +70,13 @@ class ISAPI:
         pass
 
     def get_users(self):
-        users_xml = self.get_request(self.ISAPI_PATHS["USERS"])
-        if users_xml["success"] == 0 or users_xml["error"]:
+        """ Возвращает список словарей вида: {'id': '1', 'userName': 'admin', 'userLevel': 'Administrator'} или None (в случае ошибки)"""
+        response_xml = self.get_request(self.ISAPI_PATHS["USERS"])
+        if ISAPI.is_request_has_successs(response_xml):
             return None
         else:
             result = []
-            root = ET.XML(users_xml["text"])
+            root = ET.XML(response_xml["text"])
             users_data = self.xml_to_dict_recursive(root)
 
             for user in users_data["UserList"]:
@@ -84,10 +91,22 @@ class ISAPI:
 
             return result
 
+    def get_device_info(self):
+        response_xml = self.get_request(self.ISAPI_PATHS["DEVICE_INFO"])
+        if ISAPI.is_request_has_successs(response_xml):
+            return None
+        else:
+            root = ET.XML(response_xml["text"])
+            response = self.xml_to_dict_recursive(root)
+            return response
+
 
 if __name__ == '__main__':
     isapi = ISAPI(ip="192.168.2.168", login='admin', password='2wsx#EDC')
     users = isapi.get_users()
     print(users)
-    for user in users:
-        print(user)
+    if users:
+        for user in users:
+            print(user)
+
+    print(isapi.get_device_info())
