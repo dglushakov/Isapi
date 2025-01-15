@@ -24,7 +24,6 @@ setup(
     ],
     keywords='example python',
     project_urls={
-
     },
     python_requires='>=3.7'
 )
